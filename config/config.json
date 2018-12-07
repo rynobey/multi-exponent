@@ -1,0 +1,9 @@
+{
+  "apiServerAddress":"http://localhost:5000",
+  "decimalPrecision":100,
+  "blockchainProxyAddress":"http://localhost:3000",
+  "keystoreAddress":"http://localhost:12000",
+  "blockchainNodeAddress":"http://localhost:20010",
+  "blockchainNodeNetId":"*",
+  "blockchainNodeGasPrice":"0"
+}
