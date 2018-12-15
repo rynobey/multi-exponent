@@ -1,6 +1,389 @@
 pragma solidity ^0.4.23;
 
 contract EcOperations {
+
+  uint256 constant GROUP_ORDER = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
+  uint256 constant PP = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
+  uint256 constant a = 0;
+  uint256 constant b = 7;
+
+  //function makeAffine(uint256[] a) public view returns(uint256[] p) {
+  //  assembly {
+
+  //  }
+  //}
+
+  //function _inverse(uint256 a) public view returns(uint256)
+  //{
+  //    uint256 t=0;
+  //    uint256 newT=1;
+  //    uint256 r=PP;
+  //    uint256 newR=a;
+  //    uint256 q;
+  //    while (newR != 0) {
+  //        q = r / newR;
+
+  //        (t, newT) = (newT, addmod(t , (r - mulmod(q, newT,r)) , r));
+  //        (r, newR) = (newR, r - q * newR );
+  //    }
+
+  //    return t;
+  //}
+
+  function ecAddc(uint256 ax, uint256 ay, uint256 az, uint256 bx, uint256 by, uint256 bz) public returns(uint256[3] p) {
+    if (ay == by) {
+      p = ecDbli(ax, ay, az);
+    } else {
+      p = ecAddi(ax, ay, az, bx, by, bz);
+    }
+  }
+
+  function ecAddi(uint256 ax, uint256 ay, uint256 az, uint256 bx, uint256 by, uint256 bz) internal view returns(uint256[3] p) {
+    assembly {
+      let P := 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+      //Z1Z1 = Z1^2, z1z1 offset = 0x1020
+      mstore(
+        0x1020,
+        mulmod(
+          az,
+          az,
+          P
+        )
+      )
+      //Z2Z2 = Z2^2, z2z2 offset = 0x1040
+      mstore(
+        0x1040,
+        mulmod(
+          bz,
+          bz,
+          P
+        )
+      )
+      //U1 = X1*Z2Z2, u1 offset = 0x1060
+      mstore(
+        0x1060,
+        mulmod(
+          ax,
+          mload(0x1040),
+          P
+        )
+      )
+      //S1 = Y1*t0, s1 offset = 0x10E0
+      mstore(
+        0x10E0,
+        mulmod(
+          ay,
+          //t0 = Z2*Z2Z2
+          mulmod(
+            bz,
+            mload(0x1040),
+            P
+          ),
+          P
+        )
+      )
+      //H = U2-U1, h offset = 0x1140
+      mstore(
+        0x1140,
+        addmod(
+          //U2 = X2*Z1Z1
+          mulmod(
+            bx,
+            mload(0x1020),
+            P
+          ),
+          // -u1
+          sub(
+            P,
+            mload(0x1060)
+          ),
+          P
+        )
+      )
+      //HH = H^2, hh offset = 0x1160
+      mstore(
+        0x1160,
+        mulmod(
+          mload(0x1140),
+          mload(0x1140),
+          P
+        )
+      )
+      //HHH = H*HH, hhh offset = 0x1180
+      mstore(
+        0x1180,
+        mulmod(
+          mload(0x1140),
+          mload(0x1160),
+          P
+        )
+      )
+      //r = S2-S1, r offset = 0x11C0
+      mstore(
+        0x11C0,
+        addmod(
+          //S2 = Y2*t1
+          mulmod(
+            by,
+            //t1 = Z1*Z1Z1
+            mulmod(
+              az,
+              mload(0x1020),
+              P
+            ),
+            P
+          ),
+          // -s1
+          sub(
+            P,
+            mload(0x10E0)
+          ),
+          P
+        )
+      )
+      //V = U1*HH, v offset = 0x11E0
+      mstore(
+        0x11E0,
+        mulmod(
+          mload(0x1060),
+          mload(0x1160),
+          P
+        )
+      )
+      //X3 = t4-t3, X3 -> p + 0x00
+      mstore(
+        p,
+        addmod(
+          //t4 = t2-HHH
+          addmod(
+            // t2 = r^2
+            mulmod(
+              mload(0x11C0),
+              mload(0x11C0),
+              P
+            ),
+            sub(
+              P,
+              mload(0x1180)
+            ),
+            P
+          ),
+          // -t3
+          sub(
+            P,
+            //t3 = 2*V
+            mulmod(
+              0x02,
+              mload(0x11E0),
+              P
+            )
+          ),
+          P
+        )
+      )
+      //Y3 = t7-t6, Y3 -> p + 0x20
+      mstore(
+        add(p, 0x20),
+        addmod(
+          // t7 = r*t5
+          mulmod(
+            mload(0x11C0),
+            //t5 = V-X3
+            addmod(
+              mload(0x11E0),
+              // -X3
+              sub(
+                P,
+                mload(p)
+              ),
+              P
+            ),
+            P
+          ),
+          // -t6
+          sub(
+            P,
+            // t6 = s1*hhh
+            mulmod(
+              mload(0x10E0),
+              mload(0x1180),
+              P
+            )
+          ),
+          P
+        )
+      )
+      //Z3 = Z1*t8, Z3 -> p + 0x40
+      mstore(
+        add(p, 0x40),
+        mulmod(
+          az,
+          // t8 = z2*h
+          mulmod(
+            bz,
+            mload(0x1140),
+            P
+          ),
+          P
+        )
+      )
+    }
+  }
+
+  function ecDbli(uint256 ax, uint256 ay, uint256 az) public view returns(uint256[3] p) {
+    assembly {
+      let P := 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+      //A = X1^2, A offset = 0x1020
+      mstore(
+        0x1020,
+        mulmod(
+          ax,
+          ax,
+          P
+        )
+      )
+      //B = Y1^2, B offset = 0x1040
+      mstore(
+        0x1040,
+        mulmod(
+          ay,
+          ay,
+          P
+        )
+      )
+      //C = B^2, u1 offset = 0x1060
+      mstore(
+        0x1060,
+        mulmod(
+          mload(0x1040),
+          mload(0x1040),
+          P
+        )
+      )
+      //D = 2*t3, D offset = 0x1080
+      mstore(
+        0x1080,
+        mulmod(
+          0x02,
+          //t3 = t2-C
+          addmod(
+            // t2 = t1-A
+            addmod(
+              // t1 = t0^2
+              mulmod(
+                // t0 = X1+B
+                addmod(
+                  ax,
+                  mload(0x1040),
+                  P
+                ),
+                // t0 = X1+B
+                addmod(
+                  ax,
+                  mload(0x1040),
+                  P
+                ),
+                P
+              ),
+              sub(
+                P,
+                mload(0x1020)
+              ),
+              P
+            ),
+            sub(
+              P,
+              mload(0x1060)
+            ),
+            P
+          ),
+          P
+        )
+      )
+      //E = 3*A, E offset = 0x1140
+      mstore(
+        0x1140,
+        mulmod(
+          0x03,
+          mload(0x1020),
+          P
+        )
+      )
+      //F = E^2, F offset = 0x1160
+      mstore(
+        0x1160,
+        mulmod(
+          mload(0x1140),
+          mload(0x1140),
+          P
+        )
+      )
+      //X3 = F-t4, X3 -> p + 0x00
+      mstore(
+        p,
+        addmod(
+          mload(0x1160),
+          sub(
+            P,
+            // t4 = 2*D
+            mulmod(
+              0x02,
+              mload(0x1080),
+              P
+            )
+          ),
+          P
+        )
+      )
+      //Y3 = t7-t6, r -> p + 0x20
+      mstore(
+        add(p, 0x20),
+        addmod(
+          //t7 = E*t5
+          mulmod(
+            mload(0x1140),
+            //t5 = D-X3
+            addmod(
+              mload(0x1080),
+              // -X3
+              sub(
+                P,
+                p
+              ),
+              P
+            ),
+            P
+          ),
+          // -t6
+          sub(
+            P,
+            // t6 = 8*C
+            mulmod(
+              0x08,
+              mload(0x1060),
+              P
+            )
+          ),
+          P
+        )
+      )
+      //Z3 = 2*t8, Z3 -> p + 0x40
+      mstore(
+        add(p, 0x40),
+        mulmod(
+          0x02,
+          // t8 = Y1*Z1
+          mulmod(
+            ay,
+            az,
+            P
+          ),
+          P
+        )
+      )
+    }
+  }
+
   function ecAdd(uint256 ax, uint256 ay, uint256 bx, uint256 by) public view returns(uint256[2] p) {
     uint256[4] memory input;
     input[0] = ax;
@@ -25,77 +408,5 @@ contract EcOperations {
         revert(0, 0)
       }
     }
-  }
-
- /* This function uses a set of precomputed sums of group elements in order
-  * to significantly speed-up the calculation of an EC multi-scalar multiplication.
-  * This speed-up will only be available where the multiplications are performed
-  * using a set of precomputed values specially created for the given bitSetSize,
-  * computeSetSize and set of group elements. If the provided precomputations
-  * are missing the values required by the calculation, they will be
-  * calculated and persisted for future use. If no precomputed values are
-  * passed in, the necessary values will be calculated, but not persisted.
-  */
-  function ecMultiMul(uint256[] x, uint256[] y, uint256[] scalar, uint numComputeSetBits) public view returns(uint256[2] p) {
-    uint numBitSetBits = 256; // TODO: cater for other bit set sizes and move to input parameter
-    // TODO: cater for precomputed values to be provided as input parameter (by reference)
-    // TODO: check that 256 is divisible by numBitSetBits with remainder = 0
-    // TODO: check that numBitSetBits <= 256
-    // check that all input arrays have the same length
-    require(x.length == y.length);
-    require(y.length == scalar.length);
-    // check that (256 / numBitSetBits) * scalar.length is divisible by the numComputeSetBits with remainder = 0
-    require(256/numBitSetBits*scalar.length % numComputeSetBits == 0);
-    uint numComputeSets = 256/numBitSetBits*scalar.length/numComputeSetBits;
-    uint256 numComputeSums = 2**numComputeSetBits - 1;
-    // allocate memory for precomputations (2*uint256 for each group element)
-    uint256[] memory data = new uint256[](2*numComputeSums*numComputeSets);
-    // set output group element to zero
-    uint256[2] memory output;
-    // loop over inputs and extract bits from scalars
-    for (uint i = 0; i < numBitSetBits; i++) {
-      // if no precomputations are provided
-      // extract bits of current bit set
-      uint256[] memory bitMasks = calcBitMasks(i, numBitSetBits);
-      for (uint j = 0; j < numComputeSets; j++) {
-        // compute decimal number (to be used as array index)
-        uint idx = calcIndex(scalar, bitMasks, j, numComputeSetBits, numBitSetBits, i);
-        //data[i*numComputeSets*2 + idx*2] = x[j*numComputeSetBits];
-        //data[i*numComputeSets*2 + idx*2 + 1] = y[0];
-        //output[0] = 2*output[0] + x[0];
-        //output[1] = 2*output[1] + y[0];
-      }
-    }
-    // loop over sets
-      // loop over numbers/bit-strings in set
-        // compute corresponding sum of group elements, skip if exists
-    // loop over bitSet positions, starting from MSB
-      // loop over sets
-        // add precomputed sum of group elements
-      // double current answer
-    // return final sum
-    p = output;
-    return p;
-  }
-
-  function calcIndex(uint256[] scalar, uint256[] bitMasks, uint computeSetPosition, uint numComputeSetBits, uint numBitSetBits, uint bitPosition) public view returns(uint idx) {
-    for (uint i = 0; i < numComputeSetBits; i++) {
-      uint scalarIdx = computeSetPosition*numComputeSetBits + i/(256/numBitSetBits);
-      uint maskIdx = i%(256/numBitSetBits);
-      uint numShiftPositions = bitPosition-(i%(256/numBitSetBits))*numBitSetBits;
-      uint digit = (scalar[scalarIdx] & bitMasks[maskIdx])/(2**numShiftPositions);
-      if (digit == 1) {
-        idx = idx + (2**i);
-      }
-    }
-    return idx;
-  }
-
-  function calcBitMasks(uint bitPosition, uint numBitSetBits) public view returns(uint256[] bitMasks) {
-    //uint256[] memory bitMasks = new uint[](256/numBitSetBits);
-    for (uint i = 0; i < (256/numBitSetBits); i++) {
-      bitMasks[i] = uint256(2**(256-i*numBitSetBits-bitPosition-1));
-    }
-    return bitMasks;
   }
 }
