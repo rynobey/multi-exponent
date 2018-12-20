@@ -401,7 +401,7 @@ contract EcOperations {
     //p = makeAffine(p[0], p[1], p[2]);
   }
 
-  function ecAdd(uint256 ax, uint256 ay, uint256 az, uint256 bx, uint256 by, uint256 bz) public returns(uint256[3] p) {
+  function ecAdd(uint256 ax, uint256 ay, uint256 az, uint256 bx, uint256 by, uint256 bz) public pure returns(uint256[3] p) {
     /*
       Static memory map:
       0x0200: ax
