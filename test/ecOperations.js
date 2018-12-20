@@ -75,7 +75,7 @@ contract('EcOperations', (accounts) => {
     by = "0x15ed738c0e0a7c92e7845f96b2ae9c0a68a6a449e3538fc7ff3ebf7a5a18a2c4"
     bz = "1"
     value = await instance.ecAdd(ax, ay, az, bx, by, bz);
-  console.log(value)
+  //console.log(value)
     assert.strictEqual(value[0].toString(16), "20fbff5e5067c7b313cd8f3b37f7f977e8356c31443c723e288e64ac091056d");
     assert.strictEqual(value[1].toString(16), "1448861734fd860c22d8398c9a0b1aa8e9a0d4e7d3589b68cb9a328d6869ce08");
     assert.strictEqual(value[2].toString(16), "2ff59673844a73e70ddc19cd81583ab5b21eeeefdd919b7395cca27f5397dc01");
@@ -89,7 +89,7 @@ contract('EcOperations', (accounts) => {
     by = "0x1ad4473c8a4d457dedf6db10348646c18021f8befa70269b6f8545ce11ab30f6"
     bz = "0x2bdae7181c14f925cf08bf2d655d3814d14d4893c6a71f8ffe7d7ef4b4314588"
     value = await instance.ecAdd(ax, ay, az, bx, by, bz);
-  console.log(value)
+  //console.log(value)
     assert.strictEqual(value[0].toString(16), "20fbff5e5067c7b313cd8f3b37f7f977e8356c31443c723e288e64ac091056d");
     assert.strictEqual(value[1].toString(16), "1448861734fd860c22d8398c9a0b1aa8e9a0d4e7d3589b68cb9a328d6869ce08");
     assert.strictEqual(value[2].toString(16), "2ff59673844a73e70ddc19cd81583ab5b21eeeefdd919b7395cca27f5397dc01");
