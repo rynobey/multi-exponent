@@ -20,7 +20,7 @@ contract EcOperations {
       return;
     }
     uint256 z_inv = expMod(az, PP-2, PP); // find inverse using Fermat's little theorem, since PP is prime
-    // recovers x and y from Jacobian form (X, Y, Z) given that x = X/Z^3 and y = Y/Z^2
+    // recovers x and y from Jacobian form (X, Y, Z) given that x = X/Z^2 and y = Y/Z^3
     assembly {
       let P := 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
       let zz_inv := mulmod(z_inv, z_inv, P)
@@ -62,29 +62,27 @@ contract EcOperations {
       0x0200: ax
       0x0220: ay
       0x0240: az
-      0x02C0: px
-      0x02E0: py
-      0x0300: pz
     */
     assembly {
       mstore(0x0200, ax)
       mstore(0x0220, ay)
       mstore(0x0240, az)
 
-      if iszero(mload(0x0240)) { // if point a is inf
+      if iszero(az) { // if point a is inf
         setInf()
       }
-      if gt(mload(0x0240), 0) {
+      if gt(az, 0) {
         dbl()
       }
-      mstore(p, mload(0x02C0))
-      mstore(add(p, 0x20), mload(0x02E0))
-      mstore(add(p, 0x40), mload(0x0300))
+
+      mstore(p, mload(0x0200))
+      mstore(add(p, 0x20), mload(0x0220))
+      mstore(add(p, 0x40), mload(0x0240))
 
       function setInf() {
-        mstore(0x02C0, 0)
-        mstore(0x02E0, 1)
-        mstore(0x0300, 0)
+        mstore(0x0200, 0)
+        mstore(0x0220, 1)
+        mstore(0x0240, 0)
       }
 
       // Implementation of http://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/doubling/dbl-2009-l.op3
@@ -99,37 +97,38 @@ contract EcOperations {
         //C = B^2
         let tmp3d := mulmod(tmp2d, tmp2d, Pd)
         //t0 = X1+B
-        let tmp4d := addmod(axd, tmp2d, Pd)
+        let tmp4d := add(axd, tmp2d) // Since (2^256 - 1)/P ~ 5, we can afford to skip a few mod ops when adding
         //D = 2*t3 = 2*(t2-C) = 2*(t1-A-C) = 2*((X1+B)^2-(A+C))
         tmp2d := mulmod(
           0x02,
-          addmod(mulmod(tmp4d, tmp4d, Pd), sub(Pd, addmod(tmp1d, tmp3d, Pd)), Pd),
+          add(mulmod(tmp4d, tmp4d, Pd), sub(add(Pd, Pd), add(tmp1d, tmp3d))),
           Pd
         )
         //E = 3*A
-        tmp1d := mulmod(0x03, tmp1d, Pd)
+        tmp1d := mul(0x03, tmp1d)
         //F = E^2
         tmp4d := mulmod(tmp1d, tmp1d, Pd)
         //X3 = F-2*D, X3 -> p + 0x00
         mstore(
-          0x02C0,
+          0x0200,
           addmod(
             tmp4d,
-            sub(Pd, mulmod(0x02, tmp2d, Pd)),
+            sub(add(Pd, Pd), add(tmp2d, tmp2d)),
             Pd
           )
         )
         //Y3 = t7-t6 = E*(D-X3) - 8*C, r -> p + 0x20
         mstore(
-          0x02E0,
+          0x0220,
           addmod(
-            mulmod(tmp1d, addmod(tmp2d, sub(Pd, mload(0x02C0)), Pd), Pd),
-            sub(Pd, mulmod(0x08, tmp3d, Pd)), Pd
+            mulmod(tmp1d, add(tmp2d, sub(Pd, mload(0x0200))), Pd),
+            sub(Pd, mulmod(0x08, tmp3d, Pd)),
+            Pd
           )
         )
         //Z3 = 2*t8 = 2*Y1*Z1, Z3 -> p + 0x40
         mstore(
-          0x0300,
+          0x0240,
           mulmod(
             0x02,
             mulmod(ayd, mload(0x0240), Pd),
@@ -141,7 +140,268 @@ contract EcOperations {
     //p = makeAffine(p[0], p[1], p[2]);
   }
 
-  function ecAdd(uint256 ax, uint256 ay, uint256 az, uint256 bx, uint256 by, uint256 bz) public pure returns(uint256[3] p) {
+  function ecQuad(uint256 ax, uint256 ay, uint256 az) public pure returns(uint256[3] p) {
+    /*
+      Static memory map:
+      0x0200: ax
+      0x0220: ay
+      0x0240: az
+    */
+    assembly {
+      mstore(0x0200, ax)
+      mstore(0x0220, ay)
+      mstore(0x0240, az)
+
+      if iszero(az) { // if point a is inf
+        setInf()
+      }
+      if gt(az, 0) {
+        dbl()
+      }
+
+      dbl()
+
+      mstore(p, mload(0x0200))
+      mstore(add(p, 0x20), mload(0x0220))
+      mstore(add(p, 0x40), mload(0x0240))
+
+      function setInf() {
+        mstore(0x0200, 0)
+        mstore(0x0220, 1)
+        mstore(0x0240, 0)
+      }
+
+      // Implementation of http://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/doubling/dbl-2009-l.op3
+      function dbl() {
+        let Pd := 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+        let axd := mload(0x0200)
+        let ayd := mload(0x0220)
+        //A = X1^2
+        let tmp1d := mulmod(axd, axd, Pd)
+        //B = Y1^2
+        let tmp2d := mulmod(ayd, ayd, Pd)
+        //C = B^2
+        let tmp3d := mulmod(tmp2d, tmp2d, Pd)
+        //t0 = X1+B
+        let tmp4d := add(axd, tmp2d) // Since (2^256 - 1)/P ~ 5, we can afford to skip a few mod ops when adding
+        //D = 2*t3 = 2*(t2-C) = 2*(t1-A-C) = 2*((X1+B)^2-(A+C))
+        tmp2d := mulmod(
+          0x02,
+          add(mulmod(tmp4d, tmp4d, Pd), sub(add(Pd, Pd), add(tmp1d, tmp3d))),
+          Pd
+        )
+        //E = 3*A
+        tmp1d := mul(0x03, tmp1d)
+        //F = E^2
+        tmp4d := mulmod(tmp1d, tmp1d, Pd)
+        //X3 = F-2*D, X3 -> p + 0x00
+        mstore(
+          0x0200,
+          addmod(
+            tmp4d,
+            sub(add(Pd, Pd), add(tmp2d, tmp2d)),
+            Pd
+          )
+        )
+        //Y3 = t7-t6 = E*(D-X3) - 8*C, r -> p + 0x20
+        mstore(
+          0x0220,
+          addmod(
+            mulmod(tmp1d, add(tmp2d, sub(Pd, mload(0x0200))), Pd),
+            sub(Pd, mulmod(0x08, tmp3d, Pd)),
+            Pd
+          )
+        )
+        //Z3 = 2*t8 = 2*Y1*Z1, Z3 -> p + 0x40
+        mstore(
+          0x0240,
+          mulmod(
+            0x02,
+            mulmod(ayd, mload(0x0240), Pd),
+            Pd
+          )
+        )
+      }
+    }
+    //p = makeAffine(p[0], p[1], p[2]);
+  }
+
+  function ecOct(uint256 ax, uint256 ay, uint256 az) public pure returns(uint256[3] p) {
+    /*
+      Static memory map:
+      0x0200: ax
+      0x0220: ay
+      0x0240: az
+    */
+    assembly {
+      mstore(0x0200, ax)
+      mstore(0x0220, ay)
+      mstore(0x0240, az)
+
+      if iszero(az) { // if point a is inf
+        setInf()
+      }
+      if gt(az, 0) {
+        dbl()
+      }
+
+      dbl()
+      dbl()
+
+      mstore(p, mload(0x0200))
+      mstore(add(p, 0x20), mload(0x0220))
+      mstore(add(p, 0x40), mload(0x0240))
+
+      function setInf() {
+        mstore(0x0200, 0)
+        mstore(0x0220, 1)
+        mstore(0x0240, 0)
+      }
+
+      // Implementation of http://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/doubling/dbl-2009-l.op3
+      function dbl() {
+        let Pd := 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+        let axd := mload(0x0200)
+        let ayd := mload(0x0220)
+        //A = X1^2
+        let tmp1d := mulmod(axd, axd, Pd)
+        //B = Y1^2
+        let tmp2d := mulmod(ayd, ayd, Pd)
+        //C = B^2
+        let tmp3d := mulmod(tmp2d, tmp2d, Pd)
+        //t0 = X1+B
+        let tmp4d := add(axd, tmp2d) // Since (2^256 - 1)/P ~ 5, we can afford to skip a few mod ops when adding
+        //D = 2*t3 = 2*(t2-C) = 2*(t1-A-C) = 2*((X1+B)^2-(A+C))
+        tmp2d := mulmod(
+          0x02,
+          add(mulmod(tmp4d, tmp4d, Pd), sub(add(Pd, Pd), add(tmp1d, tmp3d))),
+          Pd
+        )
+        //E = 3*A
+        tmp1d := mul(0x03, tmp1d)
+        //F = E^2
+        tmp4d := mulmod(tmp1d, tmp1d, Pd)
+        //X3 = F-2*D, X3 -> p + 0x00
+        mstore(
+          0x0200,
+          addmod(
+            tmp4d,
+            sub(add(Pd, Pd), add(tmp2d, tmp2d)),
+            Pd
+          )
+        )
+        //Y3 = t7-t6 = E*(D-X3) - 8*C, r -> p + 0x20
+        mstore(
+          0x0220,
+          addmod(
+            mulmod(tmp1d, add(tmp2d, sub(Pd, mload(0x0200))), Pd),
+            sub(Pd, mulmod(0x08, tmp3d, Pd)),
+            Pd
+          )
+        )
+        //Z3 = 2*t8 = 2*Y1*Z1, Z3 -> p + 0x40
+        mstore(
+          0x0240,
+          mulmod(
+            0x02,
+            mulmod(ayd, mload(0x0240), Pd),
+            Pd
+          )
+        )
+      }
+    }
+    //p = makeAffine(p[0], p[1], p[2]);
+  }
+
+  function ecSixteen(uint256 ax, uint256 ay, uint256 az) public pure returns(uint256[3] p) {
+    /*
+      Static memory map:
+      0x0200: ax
+      0x0220: ay
+      0x0240: az
+    */
+    assembly {
+      mstore(0x0200, ax)
+      mstore(0x0220, ay)
+      mstore(0x0240, az)
+
+      if iszero(az) { // if point a is inf
+        setInf()
+      }
+      if gt(az, 0) {
+        dbl()
+      }
+
+      dbl()
+      dbl()
+      dbl()
+
+      mstore(p, mload(0x0200))
+      mstore(add(p, 0x20), mload(0x0220))
+      mstore(add(p, 0x40), mload(0x0240))
+
+      function setInf() {
+        mstore(0x0200, 0)
+        mstore(0x0220, 1)
+        mstore(0x0240, 0)
+      }
+
+      // Implementation of http://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/doubling/dbl-2009-l.op3
+      function dbl() {
+        let Pd := 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+        let axd := mload(0x0200)
+        let ayd := mload(0x0220)
+        //A = X1^2
+        let tmp1d := mulmod(axd, axd, Pd)
+        //B = Y1^2
+        let tmp2d := mulmod(ayd, ayd, Pd)
+        //C = B^2
+        let tmp3d := mulmod(tmp2d, tmp2d, Pd)
+        //t0 = X1+B
+        let tmp4d := add(axd, tmp2d) // Since (2^256 - 1)/P ~ 5, we can afford to skip a few mod ops when adding
+        //D = 2*t3 = 2*(t2-C) = 2*(t1-A-C) = 2*((X1+B)^2-(A+C))
+        tmp2d := mulmod(
+          0x02,
+          add(mulmod(tmp4d, tmp4d, Pd), sub(add(Pd, Pd), add(tmp1d, tmp3d))),
+          Pd
+        )
+        //E = 3*A
+        tmp1d := mul(0x03, tmp1d)
+        //F = E^2
+        tmp4d := mulmod(tmp1d, tmp1d, Pd)
+        //X3 = F-2*D, X3 -> p + 0x00
+        mstore(
+          0x0200,
+          addmod(
+            tmp4d,
+            sub(add(Pd, Pd), add(tmp2d, tmp2d)),
+            Pd
+          )
+        )
+        //Y3 = t7-t6 = E*(D-X3) - 8*C, r -> p + 0x20
+        mstore(
+          0x0220,
+          addmod(
+            mulmod(tmp1d, add(tmp2d, sub(Pd, mload(0x0200))), Pd),
+            sub(Pd, mulmod(0x08, tmp3d, Pd)),
+            Pd
+          )
+        )
+        //Z3 = 2*t8 = 2*Y1*Z1, Z3 -> p + 0x40
+        mstore(
+          0x0240,
+          mulmod(
+            0x02,
+            mulmod(ayd, mload(0x0240), Pd),
+            Pd
+          )
+        )
+      }
+    }
+    //p = makeAffine(p[0], p[1], p[2]);
+  }
+
+  function ecAdd(uint256 ax, uint256 ay, uint256 az, uint256 bx, uint256 by, uint256 bz) public returns(uint256[3] p) {
     /*
       Static memory map:
       0x0200: ax
@@ -162,11 +422,11 @@ contract EcOperations {
       mstore(0x0280, by)
       mstore(0x02A0, bz)
 
-      if iszero(mload(0x0240)) { // if point a is inf
+      if iszero(az) { // if point a is inf
         setB()
       }
-      if gt(mload(0x0240), 0) {
-        switch mload(0x02A0)
+      if gt(az, 0) {
+        switch bz
         case 0 {// if point b is inf
           setA()
         }
@@ -214,8 +474,9 @@ contract EcOperations {
         //T1 = X1-T1
         tmp1s := addmod(mload(0x0200), sub(Ps, tmp1s), Ps)
         //T2 = T2-Y1
-        tmp2s := addmod(tmp2s, sub(Ps, mload(0x0220)), Ps)
+        tmp2s := add(tmp2s, sub(Ps, mload(0x0220)))
         if iszero(tmp1s) {
+          tmp2s := mod(tmp2s, Ps)
           if iszero(tmp2s) { // if points are co-located, do double instead
             dbl()
           }
@@ -235,15 +496,15 @@ contract EcOperations {
           //X3 = T2^2
           let pxs := mulmod(tmp2s, tmp2s, Ps)
           //X3 = X3+T1
-          pxs := addmod(pxs, tmp1s, Ps)
+          pxs := add(pxs, tmp1s)
           //Y3 = T1*Y1
           mstore(0x02E0, mulmod(tmp1s, mload(0x0220), Ps))
           //T1 = 2*T4
-          tmp1s := mulmod(0x02, tmp4s, Ps)
+          tmp1s := add(tmp4s, tmp4s)
           //X3 = X3-T1
-          mstore(0x02C0, addmod(pxs, sub(Ps, tmp1s), Ps))
+          mstore(0x02C0, addmod(pxs, sub(add(Ps, Ps), tmp1s), Ps))
           //T4 = X3-T4
-          tmp4s := addmod(mload(0x02C0), sub(Ps, tmp4s), Ps)
+          tmp4s := add(mload(0x02C0), sub(Ps, tmp4s))
           //T4 = T4*T2
           tmp4s := mulmod(tmp4s, tmp2s, Ps)
           //Y3 = T4-Y3
@@ -253,32 +514,35 @@ contract EcOperations {
 
       // Implementation of http://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian/addition/add-1998-cmo-2.op3
       function addNrml() {
+        let azn := mload(0x0240)
+        let bzn := mload(0x02A0)
         let Pn := 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
-        let azn := mload(0x02A0)
         //Z2Z2 = Z2^2
-        let tmp1n := mulmod(azn, azn, Pn)
+        let tmp1n := mulmod(bzn, bzn, Pn)
         //U1 = X1*Z2Z2
         let tmp2n := mulmod(mload(0x0200), tmp1n, Pn)
         //S1 = Y1*t0 = Y1*Z2*Z2Z2
-        let tmp3n := mulmod(mload(0x0220), mulmod(azn, tmp1n, Pn), Pn)
+        let tmp3n := mulmod(mload(0x0220), mulmod(bzn, tmp1n, Pn), Pn)
         //Z1Z1 = Z1^2
-        tmp1n := mulmod(mload(0x0240), mload(0x0240), Pn)
+        tmp1n := mulmod(azn, azn, Pn)
         //r = S2-S1 = Y2*t1 - S1 = Y2*Z1*Z1Z1 - S1
         let tmp4n := addmod(
-          mulmod(mload(0x0280), mulmod(mload(0x0240), tmp1n, Pn), Pn),
+          mulmod(mload(0x0280), mulmod(azn, tmp1n, Pn), Pn),
           sub(Pn, tmp3n),
           Pn
         )
         //H = U2-U1 = X2*Z1Z1 - U1
-        let tmp5n := addmod(
+        let tmp5n := add(
           mulmod(mload(0x0260), tmp1n, Pn),
-          sub(Pn, tmp2n),
-          Pn
+          sub(Pn, tmp2n)
         )
-        if and(iszero(tmp4n), iszero(tmp5n)) {// if the points are co-located, do double instead
-          dbl()
+        if iszero(tmp4n) {
+          tmp5n := mod(tmp5n, Pn)
+          if iszero(tmp5n) {// if the points are co-located, do double instead
+            dbl()
+          }
         }
-        if or(gt(tmp4n, 0), gt(tmp5n, 0)) {
+        if gt(tmp4n, 0) {
           //HH = H^2, hh offset = 0x0100
           tmp1n := mulmod(tmp5n, tmp5n, Pn)
           //V = U1*HH, v offset = 0x0160
@@ -287,23 +551,23 @@ contract EcOperations {
           tmp1n := mulmod(tmp5n, tmp1n, Pn)
           //Z3 = Z1*t8 = Z1*Z2*H, Z3 -> p + 0x40
           mstore(
-            0x02C0,
-            mulmod(mload(0x0240), mulmod(azn, tmp5n, Pn), Pn)
+            0x0300,
+            mulmod(azn, mulmod(bzn, tmp5n, Pn), Pn)
           )
           //X3 = t4-t3 = r^2 - (hhh + 2*V), X3 -> p + 0x00
           mstore(
-            0x02E0,
+            0x02C0,
             addmod(
               mulmod(tmp4n, tmp4n, Pn),
-              sub(Pn, addmod(tmp1n, mulmod(0x02, tmp2n, Pn), Pn)),
+              sub(mul(0x03, Pn), add(tmp1n, add(tmp2n, tmp2n))),
               Pn
             )
           )
           //Y3 = t7-t6 = r*(V-X3) - S1*HHH, Y3 -> p + 0x20
           mstore(
-            0x0300,
+            0x02E0,
             addmod(
-              mulmod(tmp4n, addmod(tmp2n, sub(Pn, mload(0x02C0)), Pn), Pn),
+              mulmod(tmp4n, add(tmp2n, sub(Pn, mload(0x02C0))), Pn),
               sub(Pn, mulmod(tmp3n, tmp1n, Pn)),
               Pn
             )
@@ -323,15 +587,15 @@ contract EcOperations {
         //C = B^2
         let tmp3d := mulmod(tmp2d, tmp2d, Pd)
         //t0 = X1+B
-        let tmp4d := addmod(axd, tmp2d, Pd)
+        let tmp4d := add(axd, tmp2d) // Since (2^256 - 1)/P ~ 5, we can afford to skip a few mod ops when adding
         //D = 2*t3 = 2*(t2-C) = 2*(t1-A-C) = 2*((X1+B)^2-(A+C))
         tmp2d := mulmod(
           0x02,
-          addmod(mulmod(tmp4d, tmp4d, Pd), sub(Pd, addmod(tmp1d, tmp3d, Pd)), Pd),
+          add(mulmod(tmp4d, tmp4d, Pd), sub(add(Pd, Pd), add(tmp1d, tmp3d))),
           Pd
         )
         //E = 3*A
-        tmp1d := mulmod(0x03, tmp1d, Pd)
+        tmp1d := mul(0x03, tmp1d)
         //F = E^2
         tmp4d := mulmod(tmp1d, tmp1d, Pd)
         //X3 = F-2*D, X3 -> p + 0x00
@@ -339,7 +603,7 @@ contract EcOperations {
           0x02C0,
           addmod(
             tmp4d,
-            sub(Pd, mulmod(0x02, tmp2d, Pd)),
+            sub(add(Pd, Pd), add(tmp2d, tmp2d)),
             Pd
           )
         )
@@ -347,8 +611,9 @@ contract EcOperations {
         mstore(
           0x02E0,
           addmod(
-            mulmod(tmp1d, addmod(tmp2d, sub(Pd, mload(0x02C0)), Pd), Pd),
-            sub(Pd, mulmod(0x08, tmp3d, Pd)), Pd
+            mulmod(tmp1d, add(tmp2d, sub(Pd, mload(0x02C0))), Pd),
+            sub(Pd, mulmod(0x08, tmp3d, Pd)),
+            Pd
           )
         )
         //Z3 = 2*t8 = 2*Y1*Z1, Z3 -> p + 0x40
