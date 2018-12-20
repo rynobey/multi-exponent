@@ -4,8 +4,12 @@ contract EcOperations {
 
   uint256 constant GROUP_ORDER = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
   uint256 constant PP = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
-  uint256 constant a = 0;
-  uint256 constant b = 3;
+  //uint256 constant a = 0;
+  //uint256 constant b = 3;
+
+  // map of precomputed generator points
+  // first input -> generator number, second input -> scalar value, returns corresponding x/y-coords (affine)
+  mapping (uint256 => mapping (uint256 => uint256[2])) public precomputedGenerators;
 
   function makeAffine(uint256 ax, uint256 ay, uint256 az) public view returns(uint256[3] p) {
     if (az == 1) {
@@ -53,6 +57,100 @@ contract EcOperations {
       mstore(p, ax)
       mstore(add(p, 0x20), sub(P, ay))
       mstore(add(p, 0x40), az)
+    }
+  }
+
+// hash to point, use to generate random EC points without the private keys being known
+// Should ideally be something like this: https://www.di.ens.fr/~fouque/pub/latincrypt12.pdf
+// but using try and increment method for now: https://www.normalesup.org/~tibouchi/papers/bnhash-scis.pdf
+// NOTE: Susceptible to timing attacks (not an issue if input data is publicly known)
+  function hashToPoint(uint256 input) public view returns(uint256[3] p) {
+    /*
+      Static memory map:
+      0x0200: exponent base length
+      0x0220: exponent length
+      0x0240: modulus length
+      0x0260: base
+      0x0280: exponent
+      0x02A0: modulus
+      0x02C0: px / tmp for first part uint256 of hash input
+      0x02E0: py / tmp for second part of uint256 input
+      0x0300: pz
+    */
+    assembly {
+
+      let P := 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+      let b := 3
+      mstore(p, input)
+
+      // do try and increment at most 128 times
+      for { let i := 0 } lt(i, 128) { } {
+        mstore(add(p, 0x20), i)
+        let x := mod(keccak256(p, 0x40), P)
+        let rhs := addmod(mulmod(x, mulmod(x, x, P), P), b, P)
+        mstore(0x0260, rhs)
+        sqrtMod()
+        let y := mload(0x02E0)
+        switch y
+        // y == 0 if sqrt(x^3 + b) is either 0 or a quadratic non-residue modulo P
+        case 0 {
+          i := add(i, 1)
+          // if failed to get valid point on curve, return inf
+          if eq(i, 128) {
+            setInf()
+          }
+        }
+        default {
+          i := 128
+          mstore(0x02C0, x)
+          mstore(0x0300, 1)
+        }
+      }
+
+      mstore(p, mload(0x02C0))
+      mstore(add(p, 0x20), mload(0x02E0))
+      mstore(add(p, 0x40), mload(0x0300))
+
+      function setInf() {
+        mstore(0x02C0, 0)
+        mstore(0x02E0, 1)
+        mstore(0x0300, 0)
+      }
+
+      /*
+        1) Since P is prime, the Legendre symbol (a/P) indicates whether a number is
+          a quadratic residue or not (Euler's criterion):
+            If (a/P) = a^((P-1)/2) = 1, then a is a quadratic residue modulo P,
+            if (a/P) = -1, then a is a quadratic non-residue modulo P,
+            if (a/P) = 0, then a = 0 mod P.
+        2) Since P mod 4 = 3, if (a/P) = 1, then the square root of a mod P can be found using:
+            sqrt(a) = +-a^((P-1)/4)
+        3) If a is a quadratic residue modulo P, then this function returns +sqrt(a), otherwise 0.
+      */
+      function sqrtMod() {
+        // Precomputed constants
+        let Ps := 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
+        let PMinusOneDivTwo := 0x183227397098D014DC2822DB40C0AC2ECBC0B548B438E5469E10460B6C3E7EA3
+        let PPlusOneDivFour := 0xC19139CB84C680A6E14116DA060561765E05AA45A1C72A34F082305B61F3F52
+        mstore(0x0200, 0x20)                 // Length of Base
+        mstore(0x0220, 0x20)                // Length of Exponent
+        mstore(0x0240, 0x20)                // Length of Modulus
+        mstore(0x0280, PMinusOneDivTwo)      // Exponent
+        mstore(0x02A0, Ps)                   // Modulus
+        if iszero(staticcall(sub(gas, 2000), 0x05, 0x0200, 0xc0, 0x02E0, 0x20)) {
+          revert(0, 0)
+        }
+        switch mload(0x02E0)
+        case 1 { // a is a quadratic residue
+          mstore(0x0280, PPlusOneDivFour)      // Exponent
+          if iszero(staticcall(sub(gas, 2000), 0x05, 0x0200, 0xc0, 0x02E0, 0x20)) {
+            revert(0, 0)
+          }
+        }
+        default { // a is 0 or a quadratic non-residue
+          mstore(0x02E0, 0)
+        }
+      }
     }
   }
 

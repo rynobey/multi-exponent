@@ -166,4 +166,12 @@ contract('EcOperations', (accounts) => {
     assert.strictEqual(value[1].toString(16), "8e74e438cee31ac104ce59b94e45fe98a97d8f8a6e75664ce88ef5a41e72fbc");
     assert.strictEqual(value[2].toString(16), "1");
   });
+
+  it('hashToPoint: should return correct result', async () => {
+    input = "0x00"
+    value = await instance.hashToPoint(input);
+    assert.strictEqual(value[0].toString(16), "15c20c8ab7298fa949a56ff0faf50c3e75fa580045a4f4c7ab0c8deb9cc4d374");
+    assert.strictEqual(value[1].toString(16), "2561be26ea325dbcc8f8fc645848dc26e98929c1e2e31520c005a6f6b13a8988");
+    assert.strictEqual(value[2].toString(16), "1");
+  });
 });
