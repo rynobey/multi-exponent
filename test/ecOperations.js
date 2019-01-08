@@ -3,30 +3,46 @@ const EcOperations = artifacts.require('EcOperations');
 let instance;
 
 contract('EcOperations', (accounts) => {
-  beforeEach(async () => {
+  before(async () => {
+    console.log("Deploying contract and performing pre-computations...")
     instance = await EcOperations.new({from: accounts[0]});
+    // create a persistent generator point
+    value = await instance.addPersistentGenerator();
+    console.log("Gas used:", value.receipt.gasUsed)
+    // create a persistent generator point
+    value = await instance.addPersistentGenerator();
+    console.log("Gas used:", value.receipt.gasUsed)
+    // create a persistent generator point
+    value = await instance.addPersistentGenerator();
+    console.log("Gas used:", value.receipt.gasUsed)
+    // add 255 additional precomputed generator values
+    value = await instance.addPersistentGeneratorValues("0x00", "0x40");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x00", "0x40");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x00", "0x40");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x00", "0x3F");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x01", "0x40");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x01", "0x40");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x01", "0x40");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x01", "0x3F");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x02", "0x40");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x02", "0x40");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x02", "0x40");
+    console.log("Gas used:", value.receipt.gasUsed)
+    value = await instance.addPersistentGeneratorValues("0x02", "0x3F");
+    console.log("Gas used:", value.receipt.gasUsed)
+    console.log("Done!")
+    console.log()
   });
-
-  //it('ecadd: should return correct result', async () => {
-  //  ax = "1"
-  //  ay = "2"
-  //  bx = "1"
-  //  by = "2"
-  //  value = await instance.ecAddp.call(ax, ay, bx, by);
-  //  assert.strictEqual(value[0].toString(16), "30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd3");
-  //  assert.strictEqual(value[1].toString(16), "15ed738c0e0a7c92e7845f96b2ae9c0a68a6a449e3538fc7ff3ebf7a5a18a2c4");
-  //});
-
-  //it('ecmul: should return correct result', async () => {
-  //  ax = "1"
-  //  ay = "2"
-  //  b = "0x03"
-  //  value = await instance.ecMulp.call(ax, ay, b);
-  //  console.log(value[0].toString(16))
-  //  console.log(value[1].toString(16))
-  ////  assert.strictEqual(value[0].toString(16), "30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd3");
-  ////  assert.strictEqual(value[1].toString(16), "15ed738c0e0a7c92e7845f96b2ae9c0a68a6a449e3538fc7ff3ebf7a5a18a2c4");
-  //});
 
   it('ecAdd: should return correct result if a is inf', async () => {
     ax = "0"
@@ -75,7 +91,6 @@ contract('EcOperations', (accounts) => {
     by = "0x15ed738c0e0a7c92e7845f96b2ae9c0a68a6a449e3538fc7ff3ebf7a5a18a2c4"
     bz = "1"
     value = await instance.ecAdd(ax, ay, az, bx, by, bz);
-  //console.log(value)
     assert.strictEqual(value[0].toString(16), "20fbff5e5067c7b313cd8f3b37f7f977e8356c31443c723e288e64ac091056d");
     assert.strictEqual(value[1].toString(16), "1448861734fd860c22d8398c9a0b1aa8e9a0d4e7d3589b68cb9a328d6869ce08");
     assert.strictEqual(value[2].toString(16), "2ff59673844a73e70ddc19cd81583ab5b21eeeefdd919b7395cca27f5397dc01");
@@ -89,7 +104,6 @@ contract('EcOperations', (accounts) => {
     by = "0x1ad4473c8a4d457dedf6db10348646c18021f8befa70269b6f8545ce11ab30f6"
     bz = "0x2bdae7181c14f925cf08bf2d655d3814d14d4893c6a71f8ffe7d7ef4b4314588"
     value = await instance.ecAdd(ax, ay, az, bx, by, bz);
-  //console.log(value)
     assert.strictEqual(value[0].toString(16), "20fbff5e5067c7b313cd8f3b37f7f977e8356c31443c723e288e64ac091056d");
     assert.strictEqual(value[1].toString(16), "1448861734fd860c22d8398c9a0b1aa8e9a0d4e7d3589b68cb9a328d6869ce08");
     assert.strictEqual(value[2].toString(16), "2ff59673844a73e70ddc19cd81583ab5b21eeeefdd919b7395cca27f5397dc01");
@@ -100,43 +114,9 @@ contract('EcOperations', (accounts) => {
     ay = "0x15ed738c0e0a7c92e7845f96b2ae9c0a68a6a449e3538fc7ff3ebf7a5a18a2c4"
     az = "0x01"
     value = await instance.ecDbl(ax, ay, az);
-  //console.log(value)
     assert.strictEqual(value[0].toString(16), "c696a22f504436d53570eb15c5d55d31940e07e4582d78c9380f50e480ca6f9");
     assert.strictEqual(value[1].toString(16), "1ad4473c8a4d457dedf6db10348646c18021f8befa70269b6f8545ce11ab30f6");
     assert.strictEqual(value[2].toString(16), "2bdae7181c14f925cf08bf2d655d3814d14d4893c6a71f8ffe7d7ef4b4314588");
-  });
-
-  it('ecQuad: should return correct result', async () => {
-    ax = "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd3"
-    ay = "0x15ed738c0e0a7c92e7845f96b2ae9c0a68a6a449e3538fc7ff3ebf7a5a18a2c4"
-    az = "1"
-    value = await instance.ecQuad(ax, ay, az);
-  //console.log(value)
-    assert.strictEqual(value[0].toString(16), "3371ba31a2de2d7a795a9b65042c075fec07b1b65c417dc2d0b2647b67bf11e");
-    assert.strictEqual(value[1].toString(16), "2791774d4e7f246fa2c9de1a7c94e465e229940eafc1cef3a5b80c3eb3fb23c1");
-    assert.strictEqual(value[2].toString(16), "17e5d3aae5f64c5dedac86648d34dcacdc79e23bef3676b0b7f0da965147abf5");
-  });
-
-  it('ecOct: should return correct result', async () => {
-    ax = "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd3"
-    ay = "0x15ed738c0e0a7c92e7845f96b2ae9c0a68a6a449e3538fc7ff3ebf7a5a18a2c4"
-    az = "1"
-    value = await instance.ecOct(ax, ay, az);
- // console.log(value)
-    assert.strictEqual(value[0].toString(16), "c0289e1738c07ac3dd7ebbfb13a11bbe4d0c3501abcdead57d51fc6de4b4dc6");
-    assert.strictEqual(value[1].toString(16), "21c0fc64929859b87e4a70a888f37835b1c0642116c142cdb802e28180931a6b");
-    assert.strictEqual(value[2].toString(16), "2ba4488b6309cb25fe727d59c5353525479b2dd39dd3ad7861c71aee066e90ab");
-  });
-
-  it('ecSixteen: should return correct result', async () => {
-    ax = "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd3"
-    ay = "0x15ed738c0e0a7c92e7845f96b2ae9c0a68a6a449e3538fc7ff3ebf7a5a18a2c4"
-    az = "1"
-    value = await instance.ecSixteen(ax, ay, az);
-  //console.log(value)
-    assert.strictEqual(value[0].toString(16), "d3538d82a4dac34721e42cccbb6fd19b5ac3e956097044202cc69e10df5c8d0");
-    assert.strictEqual(value[1].toString(16), "1a78a971295368fde56f82502cc953b2894fd3732d626ee0e314515ded1b727");
-    assert.strictEqual(value[2].toString(16), "2d87dbf131f922a89af05a48663eddd49486538e014cd034d8056109be3a07b3");
   });
 
   it('ecNeg: should return correct result', async () => {
@@ -168,10 +148,44 @@ contract('EcOperations', (accounts) => {
   });
 
   it('hashToPoint: should return correct result', async () => {
-    input = "0x00"
+    input = "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47"
     value = await instance.hashToPoint(input);
-    assert.strictEqual(value[0].toString(16), "15c20c8ab7298fa949a56ff0faf50c3e75fa580045a4f4c7ab0c8deb9cc4d374");
-    assert.strictEqual(value[1].toString(16), "2561be26ea325dbcc8f8fc645848dc26e98929c1e2e31520c005a6f6b13a8988");
+    //console.log(value)
+    assert.strictEqual(value[0].toString(16), "2d8ded62f522b61488ae8afcc734331d12a576a5f5cb7738b892d4fbb2f20dad");
+    assert.strictEqual(value[1].toString(16), "1e8e0e2a692dde8f8fd440aa0a5c1e84e2cf84cf8c367983eb6d36a2fca274f0");
     assert.strictEqual(value[2].toString(16), "1");
+  });
+
+  it('addPersistentGenerator: should add a generator', async () => {
+    value = await instance.getPersistentGeneratorValue("0x00", "0x01");
+    assert.strictEqual(value[0].toString(16), "2d8ded62f522b61488ae8afcc734331d12a576a5f5cb7738b892d4fbb2f20dad");
+    assert.strictEqual(value[1].toString(16), "1e8e0e2a692dde8f8fd440aa0a5c1e84e2cf84cf8c367983eb6d36a2fca274f0");
+    assert.strictEqual(value[2].toString(16), "1");
+    value = await instance.getPersistentGeneratorValue("0x02", "0x01");
+    assert.strictEqual(value[0].toString(16), "2c507b58a906531ceca4eb36c967a99dc9a42c8b08ea37f82a1db56d8e9d4cbe");
+    assert.strictEqual(value[1].toString(16), "e10e92ea6680e5777f34b53a5b9bd5f436e881ab72ecc92d8e278494b2beb78");
+    assert.strictEqual(value[2].toString(16), "1");
+  });
+
+  it('addPersistentGeneratorValues: should add generator values', async () => {
+    value = await instance.getPersistentGeneratorValue("0x00", "0x02");
+    assert.strictEqual(value[0].toString(16), "12c210556f4130883ea9101b518fa2bbf6ad9dedd5f65fcdb4af5795db000cab");
+    assert.strictEqual(value[1].toString(16), "1e6d3a57a1c7fe65624def605ab811ad6c53f3d599d75cf64c446248f6b7597");
+    assert.strictEqual(value[2].toString(16), "1");
+    value = await instance.getPersistentGeneratorValue("0x00", "0x100");
+    assert.strictEqual(value[0].toString(16), "1a2385c109ff3cebcff7d146d2d1e179f4e84b3f41e06b224f556ff1c90af128");
+    assert.strictEqual(value[1].toString(16), "1c5923643325271e25172dbb7b8864df98ec6cff9bf518edb00a883c811a8cc");
+    assert.strictEqual(value[2].toString(16), "1");
+  });
+
+  it('ecMultiScalarMult: should return correct result', async () => {
+    input = ["0x12c210556f4130883ea9101b518fa2bbf6ad9dedd5f65fcdb4af5795db000cab", "0x1a2385c109ff3cebcff7d146d2d1e179f4e84b3f41e06b224f556ff1c90af128", "0x2d8ded62f522b61488ae8afcc734331d12a576a5f5cb7738b892d4fbb2f20dad"]
+    //input = ["0x12c210556f4130883ea9101b518fa2bbf6ad9dedd5f65fcdb4af5795db000cab", "0x1a2385c109ff3cebcff7d146d2d1e179f4e84b3f41e06b224f556ff1c90af128"]
+    //input = ["0x01", "0x01"]
+    //input = ["0x01", "0x01", "0x01"]
+    value = await instance.ecMultiScalarMult(input);
+    assert.strictEqual(value[0].toString(16), "1cd54b86572de61e3fcd70174358dd63acfd6b85231b294dac794d3d87021a4d");
+    assert.strictEqual(value[1].toString(16), "199bad177e21d93e341c5392dfc29e56cf4f888ee56f8eb3e84cad226840a700");
+    assert.strictEqual(value[2].toString(16), "bcb6546280a369910d9a18ebd8422c7f18cd018c04351a6b3d85212986c77db");
   });
 });
